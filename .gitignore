@@ -63,3 +63,8 @@ test_outputs/
 # design note
 design_note.pptx
 design_note/
+
+# Batch files
+*.bat
+!run.bat
+# Keeping run.bat in git since it's essential for users
