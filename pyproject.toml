@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "transient-absorption-analyser"
+version = "0.1.0"
+description = "A Python application for analyzing transient absorption spectroscopy data"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "transient_absorption_analyser", from = "."}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+PySide6 = "^6.6.0"
+numpy = "^1.20.0"
+pandas = "^1.3.0"
+matplotlib = "^3.4.0"
+scipy = "^1.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+black = "^22.3.0"
+flake8 = "^4.0.1"
+mypy = "^0.950"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+analyzer = "transient_absorption_analyser.src.main:main" 
