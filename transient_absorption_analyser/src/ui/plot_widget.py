@@ -58,9 +58,9 @@ class PlotWidget(QWidget):
         """Setup the plot configuration."""
         # Configure figure margins with more space for labels and title
         self.figure.subplots_adjust(
-            left=0.2,     # Increased left margin for y-label (was 0.15)
+            left=0.2,     # Left margin for y-label
             right=0.95,   # Right margin
-            top=0.90,     # Top margin for title
+            top=0.85,     # Reduced top margin to bring title closer (was 0.90)
             bottom=0.12,  # Bottom margin for x-label
             wspace=0.2,   # Width spacing
             hspace=0.1    # Height spacing
@@ -68,7 +68,7 @@ class PlotWidget(QWidget):
         
         # Set initial plot properties
         if self.title:
-            self.ax.set_title(self.title, pad=15)
+            self.ax.set_title(self.title, pad=8)  # Reduced padding (was 15)
         self.ax.grid(True)
         
     def plot_all_wavelengths(
@@ -121,13 +121,13 @@ class PlotWidget(QWidget):
         self.figure.subplots_adjust(
             left=0.2,     # Match the new left margin
             right=0.95,
-            top=0.90,
+            top=0.85,
             bottom=0.12
         )
         
         # Set title with padding
         if self.ax.get_title():
-            self.ax.set_title(self.ax.get_title(), pad=15)
+            self.ax.set_title(self.ax.get_title(), pad=8)
             
         self.canvas.draw()
         
@@ -200,13 +200,13 @@ class PlotWidget(QWidget):
         self.figure.subplots_adjust(
             left=0.2,     # Match the new left margin
             right=0.95,
-            top=0.90,
+            top=0.85,
             bottom=0.12
         )
         
         # Set title with padding
         if self.ax.get_title():
-            self.ax.set_title(self.ax.get_title(), pad=15)
+            self.ax.set_title(self.ax.get_title(), pad=8)
             
         self.canvas.draw()
         
@@ -241,19 +241,19 @@ class PlotWidget(QWidget):
         self.time_range = time_range
         # Set labels with increased padding
         self.ax.set_xlabel("Wavelength (nm)", fontsize=10, labelpad=5)
-        self.ax.set_ylabel("Average Intensity", fontsize=10, labelpad=15)  # Increased labelpad
+        self.ax.set_ylabel("Average Intensity", fontsize=10, labelpad=15)
         self.ax.set_title(
             f"average intensity v.s. wavelength\ntime span: {time_range[0]:.2f} - {time_range[1]:.2f} ns",
-            pad=15
+            pad=8  # Reduced padding (was 15)
         )
         self.ax.grid(True)
         
-        # Use the same margins as _setup_plot
+        # Use updated margins
         self.figure.subplots_adjust(
-            left=0.2,     # Match the new left margin
-            right=0.95,
-            top=0.90,
-            bottom=0.12
+            left=0.2,     # Left margin for y-label
+            right=0.95,   # Right margin
+            top=0.85,     # Reduced top margin to bring title closer
+            bottom=0.12   # Bottom margin for x-label
         )
         
         self.canvas.draw()
