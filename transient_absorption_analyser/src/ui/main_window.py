@@ -1,6 +1,7 @@
 """
 Main window implementation for the Transient Absorption Analyser.
 """
+from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, 
     QTabWidget,
@@ -9,9 +10,11 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
     QFileDialog,
-    QHBoxLayout
+    QHBoxLayout,
+    QLabel
 )
 from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QPixmap
 
 from .tabs.load_tab import LoadTab
 from .tabs.spectrum_tab import SpectrumTab
@@ -38,10 +41,27 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(8, 8, 8, 8)  # Add some padding
         
-        # Create top section with export button
+        # Create top section with title image and export button
         top_section = QWidget()
         top_layout = QHBoxLayout(top_section)
         top_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add left stretch to center the title
+        top_layout.addStretch(1)
+        
+        # Add title image
+        title_label = QLabel()
+        title_path = Path(__file__).parent.parent.parent / 'resources' / 'app_title.png'
+        if title_path.exists():
+            pixmap = QPixmap(str(title_path))
+            # Scale to a reasonable height while maintaining aspect ratio
+            scaled_pixmap = pixmap.scaledToHeight(80, Qt.SmoothTransformation)
+            title_label.setPixmap(scaled_pixmap)
+            title_label.setAlignment(Qt.AlignCenter)
+        top_layout.addWidget(title_label)
+        
+        # Add stretch to center the title
+        top_layout.addStretch(1)
         
         # Create export button
         self.export_button = QPushButton("Export")
@@ -58,9 +78,6 @@ class MainWindow(QMainWindow):
             "}"
         )
         self.export_button.clicked.connect(self.handle_export)
-        
-        # Add stretch to push button to the right
-        top_layout.addStretch(1)
         top_layout.addWidget(self.export_button)
         
         # Create tab widget
