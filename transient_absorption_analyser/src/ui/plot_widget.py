@@ -131,9 +131,9 @@ class PlotWidget(QWidget):
         self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=15)
         self.ax.grid(True)
         
-        # Place legend outside
+        # Place legend outside to the right with smaller font
         self.ax.legend(
-            fontsize=8,
+            fontsize=7,  # Reduced font size
             bbox_to_anchor=(1.02, 1),
             loc='upper left',
             borderaxespad=0
@@ -142,7 +142,7 @@ class PlotWidget(QWidget):
         # Use the same margins
         self.figure.subplots_adjust(
             left=0.2,
-            right=0.85,
+            right=0.85,  # Increased right margin to accommodate legend
             top=0.85,
             bottom=0.15
         )
@@ -215,18 +215,20 @@ class PlotWidget(QWidget):
         self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=15)  # Increased labelpad
         self.ax.grid(True)
         
-        # Update legend based on whether we have highlights
-        if highlighted_wavelengths:
-            self.ax.legend(fontsize=8, loc='upper right')  # Show legend with highlighted wavelengths
-        else:
-            self.ax.legend(fontsize=8, loc='upper right', labels=['All wavelengths'])  # Simple legend when no highlights
+        # Place legend outside to the right with smaller font, matching plot_all_wavelengths
+        self.ax.legend(
+            fontsize=7,  # Reduced font size
+            bbox_to_anchor=(1.02, 1),
+            loc='upper left',
+            borderaxespad=0
+        )
         
-        # Use the same margins as _setup_plot
+        # Use the same margins as plot_all_wavelengths
         self.figure.subplots_adjust(
-            left=0.2,     # Match the new left margin
-            right=0.95,
+            left=0.2,
+            right=0.85,  # Increased right margin to accommodate legend
             top=0.85,
-            bottom=0.12
+            bottom=0.15
         )
         
         # Restore the title with the same formatting
