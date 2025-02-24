@@ -2,6 +2,8 @@
 Load tab implementation for data loading and initial processing.
 """
 from typing import Optional, Dict
+
+# Import PySide6 first
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -17,8 +19,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 
+# Configure pandas before importing
+import os
+os.environ['QTPY_DISABLE_FEATURES'] = 'clipboard'
+
+# Now import pandas and numpy
 import pandas as pd
 import numpy as np
+
 from transient_absorption_analyser.src.core.data_processor import DataProcessor, ProcessedData
 
 class LoadTab(QWidget):
