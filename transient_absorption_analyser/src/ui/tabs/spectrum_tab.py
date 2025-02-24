@@ -31,16 +31,15 @@ class SpectrumTab(QWidget):
         super().__init__(parent)
         self.current_data: Optional[ProcessedData] = None
         self.wavelength_buttons = []
-        self._sync_in_progress = False  # Add sync flag
+        self._sync_in_progress = False
         
         # Create the plots first
         self.plot_a = PlotWidget()
         self.plot_b = PlotWidget()
         
-        # Configure plot sizes
+        # Configure plot sizes - ensure both plots have identical fixed size
         for plot in [self.plot_a, self.plot_b]:
-            plot.setMinimumSize(600, 400)  # Updated to match new figure dimensions (6*100 x 4*100)
-            plot.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            plot.setFixedSize(600, 400)  # Fixed size instead of minimum size
         
         # Connect plot draw events for sync zoom
         self.plot_a.canvas.mpl_connect('draw_event', self._on_plot_a_draw)
@@ -50,7 +49,7 @@ class SpectrumTab(QWidget):
         self.setup_ui()
         
         # Initialize plot views after UI setup
-        QApplication.processEvents()  # Let Qt process pending events
+        QApplication.processEvents()
         self._initialize_default_view()
         
     def setup_ui(self):
@@ -71,16 +70,16 @@ class SpectrumTab(QWidget):
         # Add title for Plot A
         left_title = QLabel("All curves")
         left_title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        left_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
-        left_title.setAlignment(Qt.AlignCenter)  # Center align the text
+        left_title.setContentsMargins(5, 5, 5, 5)
+        left_title.setAlignment(Qt.AlignCenter)
         left_layout.addWidget(left_title)
         
-        self.plot_a.setMinimumSize(600, 400)  # Updated size here too for consistency
+        # Add Plot A (size already fixed in __init__)
         left_layout.addWidget(self.plot_a)
         
         # Tag input section
         tag_layout = QHBoxLayout()
-        tag_layout.setContentsMargins(5, 5, 5, 5)  # Add small padding
+        tag_layout.setContentsMargins(5, 5, 5, 5)
         tag_label = QLabel("Tag:")
         self.tag_input = QLineEdit()
         self.apply_tag_button = QPushButton("Apply")
@@ -97,7 +96,7 @@ class SpectrumTab(QWidget):
         # Create left container
         left_container = QWidget()
         left_container.setLayout(left_layout)
-        plots_layout.addWidget(left_container, 1)  # Changed weight to 1
+        plots_layout.addWidget(left_container, 1)
         
         # Right side - Plot B
         right_layout = QVBoxLayout()
@@ -106,11 +105,11 @@ class SpectrumTab(QWidget):
         # Add title for Plot B
         right_title = QLabel("Highlight curves by choosing wavelengths")
         right_title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        right_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
-        right_title.setAlignment(Qt.AlignCenter)  # Center align the text
+        right_title.setContentsMargins(5, 5, 5, 5)
+        right_title.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(right_title)
         
-        self.plot_b.setMinimumSize(600, 400)  # Updated size here too for consistency
+        # Add Plot B (size already fixed in __init__)
         right_layout.addWidget(self.plot_b)
         
         # Create wavelength selection area

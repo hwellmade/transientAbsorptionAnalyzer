@@ -88,8 +88,8 @@ class MainWindow(QMainWindow):
         
         # Add tabs
         self.tabs.addTab(self.load_tab, "Load")
-        self.tabs.addTab(self.spectrum_tab, "Spectrum")
-        self.tabs.addTab(self.intensity_tab, "Intensity")
+        self.tabs.addTab(self.spectrum_tab, "Time Trace")
+        self.tabs.addTab(self.intensity_tab, "Spectrum")
         
         # Add widgets to layout
         layout.addWidget(top_section)

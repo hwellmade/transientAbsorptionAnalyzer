@@ -52,22 +52,46 @@ class LoadTab(QWidget):
         
         # Signal file selection
         signal_layout = QHBoxLayout()
+        signal_layout.setContentsMargins(5, 5, 5, 5)  # Add small padding
         signal_label = QLabel("Upload signal file:")
+        signal_label.setFixedWidth(120)  # Fix the label width for alignment
         self.signal_button = QPushButton("Open file dialog")
+        self.signal_button.setFixedWidth(120)  # Fix button width
         self.signal_path_label = QLabel("No file selected")
         signal_layout.addWidget(signal_label)
         signal_layout.addWidget(self.signal_button)
         signal_layout.addWidget(self.signal_path_label)
+        signal_layout.addStretch(1)  # Add stretch at the end to push everything left
         file_layout.addLayout(signal_layout)
         
         # Reference file selection
         reference_layout = QHBoxLayout()
+        reference_layout.setContentsMargins(5, 5, 5, 5)  # Add small padding
         reference_label = QLabel("Upload dark file:")
+        reference_label.setFixedWidth(120)  # Fix the label width for alignment
         self.reference_button = QPushButton("Open file dialog")
+        self.reference_button.setFixedWidth(120)  # Fix button width
         self.reference_path_label = QLabel("No file selected")
+        self.clear_reference_button = QPushButton("Clear")
+        self.clear_reference_button.setFixedWidth(60)  # Smaller width for Clear button
+        self.clear_reference_button.setStyleSheet(
+            "QPushButton {"
+            "   background-color: #ff9800;"  # Orange color
+            "   color: white;"
+            "   padding: 5px;"
+            "   border-radius: 3px;"
+            "}"
+            "QPushButton:hover {"
+            "   background-color: #f57c00;"  # Darker orange on hover
+            "}"
+        )
+        
+        # Add widgets in new order
         reference_layout.addWidget(reference_label)
         reference_layout.addWidget(self.reference_button)
         reference_layout.addWidget(self.reference_path_label)
+        reference_layout.addStretch(1)  # Push everything to left, but keep Clear button right
+        reference_layout.addWidget(self.clear_reference_button)  # Clear button at the end
         file_layout.addLayout(reference_layout)
         
         # File format info
@@ -90,7 +114,12 @@ class LoadTab(QWidget):
         ma_layout.addStretch()
         
         # Load and Go button
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 10, 0, 10)  # Add vertical padding
+        
         self.process_button = QPushButton("Load and Go")
+        self.process_button.setFixedWidth(400)  # Set fixed width to 50% of typical width
         self.process_button.setStyleSheet(
             "QPushButton {"
             "   background-color: #673ab7;"
@@ -102,6 +131,10 @@ class LoadTab(QWidget):
             "   background-color: #5e35b1;"
             "}"
         )
+        
+        button_layout.addStretch(1)  # Add stretch before button
+        button_layout.addWidget(self.process_button)  # Add button in the middle
+        button_layout.addStretch(1)  # Add stretch after button
         
         # Data display tabs
         self.data_tabs = QTabWidget()
@@ -134,7 +167,7 @@ class LoadTab(QWidget):
         # Add all sections to main layout
         layout.addWidget(file_section)
         layout.addWidget(ma_section)
-        layout.addWidget(self.process_button)
+        layout.addWidget(button_container)
         layout.addWidget(self.data_tabs)
         
     def _create_table_model(self, data: pd.DataFrame) -> QStandardItemModel:
@@ -168,6 +201,7 @@ class LoadTab(QWidget):
         self.reference_button.clicked.connect(
             lambda: self.select_file('reference')
         )
+        self.clear_reference_button.clicked.connect(self.clear_reference)
         self.process_button.clicked.connect(self.process_data)
         
         # Data processor connections
@@ -302,4 +336,38 @@ class LoadTab(QWidget):
         
     def get_moving_average_window(self) -> int:
         """Get current moving average window size."""
-        return self.ma_spinbox.value() 
+        return self.ma_spinbox.value()
+
+    def clear_reference(self):
+        """Clear the reference file selection and associated data."""
+        # Clear the path label
+        self.reference_path_label.setText("No file selected")
+        
+        # Clear the reference data tables
+        empty_model = QStandardItemModel()
+        self.dark_table.setModel(empty_model)
+        self.dark_common_table.setModel(empty_model)
+        
+        # Reset the current data if it exists
+        if self.current_data is not None:
+            self.current_data.reference_data = None
+            self.current_data.dark_common = None
+            
+            # Clear the difference table since it depends on reference data
+            self.difference_table.setModel(empty_model)
+            
+            # Update MA table to show only signal data if available
+            if self.current_data.signal_data is not None:
+                window_size = self.ma_spinbox.value()
+                raw_data, ma_data = self.data_processor._process_data(
+                    self.current_data.signal_data, 
+                    window_size
+                )
+                self.current_data.common_data = raw_data
+                self.current_data.moving_average_data = ma_data
+                
+                # Update the MA table
+                if ma_data is not None:
+                    model = self._create_table_model(ma_data)
+                    self.ma_table.setModel(model)
+                    self.ma_table.resizeColumnsToContents() 
