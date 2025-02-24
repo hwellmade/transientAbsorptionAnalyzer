@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QApplication
 )
-from PySide6.QtCore import Qt, Slot, QSize
+from PySide6.QtCore import Qt, Slot, QSize, Signal
 import numpy as np
 
 from ..plot_widget import PlotWidget
@@ -26,6 +26,9 @@ from transient_absorption_analyser.src.core.data_processor import ProcessedData
 
 class SpectrumTab(QWidget):
     """Tab for spectrum visualization."""
+    
+    # Add signal for tag changes
+    tag_changed = Signal(str)  # Add this near the top of the class
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -394,8 +397,11 @@ class SpectrumTab(QWidget):
         tag = self.tag_input.text().strip()
         if tag:
             # Update titles for both plots
-            self.plot_a.ax.set_title(f"absorption: {tag}", pad=10, fontsize=12)
-            self.plot_b.ax.set_title(f"absorption: {tag}", pad=10, fontsize=12)
-            # Redraw both canvases
+            title = f"absorption: {tag}"
+            self.plot_a.ax.set_title(title, pad=10, fontsize=12)
+            self.plot_b.ax.set_title(title, pad=10, fontsize=12)
             self.plot_a.canvas.draw()
-            self.plot_b.canvas.draw() 
+            self.plot_b.canvas.draw()
+            
+            # Emit signal with new tag
+            self.tag_changed.emit(tag) 

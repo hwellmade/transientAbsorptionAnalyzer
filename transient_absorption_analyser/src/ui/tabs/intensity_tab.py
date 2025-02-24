@@ -31,11 +31,15 @@ class IntensityTab(QWidget):
         super().__init__(parent)
         self.current_data: Optional[ProcessedData] = None
         self.selector = None
-        self._sync_in_progress = False  # Add sync flag
+        self._sync_in_progress = False
         
-        # Create plots first
-        self.plot_a = PlotWidget()
-        self.plot_c = PlotWidget()
+        # Create plots first with sync_zoom=False
+        self.plot_a = PlotWidget(sync_zoom=False)
+        self.plot_c = PlotWidget(sync_zoom=False)
+        
+        # Configure plot sizes
+        self.plot_a.setFixedSize(600, 400)
+        self.plot_c.setFixedSize(600, 400)
         
         # Connect plot draw events for sync zoom
         self.plot_a.canvas.mpl_connect('draw_event', self._on_plot_a_draw)
@@ -70,22 +74,7 @@ class IntensityTab(QWidget):
         plot_layout_left.setSpacing(5)
 
         # Plot A (Time series) with its toolbar
-        self.plot_a = PlotWidget()
-        self.plot_a.setFixedSize(600, 400)  # Use fixed size like spectrum tab
         plot_layout_left.addWidget(self.plot_a)
-
-        # Add tag input section
-        tag_layout = QHBoxLayout()
-        tag_layout.setContentsMargins(5, 5, 5, 5)
-        tag_label = QLabel("Tag:")
-        self.tag_input = QLineEdit()
-        self.apply_tag_button = QPushButton("Apply")
-        self.apply_tag_button.clicked.connect(self._on_apply_tag)
-        
-        tag_layout.addWidget(tag_label)
-        tag_layout.addWidget(self.tag_input)
-        tag_layout.addWidget(self.apply_tag_button)
-        plot_layout_left.addLayout(tag_layout)
         
         # Add time range input section
         time_range_layout = QHBoxLayout()
@@ -149,8 +138,6 @@ class IntensityTab(QWidget):
         plot_layout_right.setSpacing(5)
 
         # Plot C (Average intensity vs wavelength) with its toolbar
-        self.plot_c = PlotWidget()
-        self.plot_c.setFixedSize(600, 400)  # Match spectrum tab dimensions
         plot_layout_right.addWidget(self.plot_c)
         
         right_panel.addWidget(plot_container_right)
@@ -256,185 +243,6 @@ class IntensityTab(QWidget):
             import traceback
             traceback.print_exc()
             
-    def _on_apply_tag(self):
-        """Handle apply tag button click."""
-        tag = self.tag_input.text().strip()
-        if tag:
-            # Update title for Plot A
-            self.plot_a.ax.set_title(f"absorption: {tag}", pad=10, fontsize=12)
-            self.plot_a.canvas.draw()
-
-    def update_data(self, data: ProcessedData):
-        """Update the displayed data."""
-        if data is None:
-            return
-            
-        self.current_data = data  # Store the data for later use
-            
-        try:
-            # Get wavelength columns (excluding time column)
-            wavelength_columns = [col for col in data.moving_average_data.columns[1:]]  # Use MA data
-            print(f"[Tab 3] Found {len(wavelength_columns)} wavelength columns")
-            
-            # Create data dictionary for plotting
-            plot_data = {}
-            all_values = []  # Track all values for scale calculation
-            for col in wavelength_columns:
-                try:
-                    wave = float(col)
-                    values = data.moving_average_data[col].to_numpy()  # Use to_numpy() like Tab 2
-                    # Validate data
-                    if len(values) > 0 and not np.all(np.isnan(values)):
-                        plot_data[wave] = values
-                        all_values.extend(values)
-                        print(f"[Tab 3] Added wavelength {wave}nm with {len(values)} points")
-                        print(f"[Tab 3] Value range for {wave}nm: {min(values):.6f} to {max(values):.6f}")
-                except (ValueError, KeyError) as e:
-                    print(f"Error processing column {col}: {str(e)}")
-                    continue
-            
-            if plot_data:
-                print(f"\n[Tab 3] Plotting {len(plot_data)} wavelengths")
-                print(f"[Tab 3] Time points: {len(data.time_points)} points")
-                print(f"[Tab 3] Time range: {min(data.time_points)} to {max(data.time_points)}")
-                
-                # Calculate expected scale based on percentiles
-                all_values = np.array(all_values)
-                y_min, y_max = np.percentile(all_values, [1, 99])
-                y_padding = (y_max - y_min) * 0.1
-                expected_ymin = y_min - y_padding
-                expected_ymax = y_max + y_padding
-                print(f"\n[Tab 3] Expected y-axis scale: [{expected_ymin:.6f}, {expected_ymax:.6f}]")
-                
-                # Plot data and let plot_all_wavelengths handle scales
-                self.plot_a.plot_all_wavelengths(
-                    data.time_points,
-                    plot_data,
-                    clear=True,
-                    respect_limits=False  # Let it calculate its own limits
-                )
-                
-                # Check actual scale after plotting
-                actual_xlim = self.plot_a.ax.get_xlim()
-                actual_ylim = self.plot_a.ax.get_ylim()
-                print(f"[Tab 3] Actual plot scales after plotting:")
-                print(f"[Tab 3] X-axis: [{actual_xlim[0]:.6f}, {actual_xlim[1]:.6f}]")
-                print(f"[Tab 3] Y-axis: [{actual_ylim[0]:.6f}, {actual_ylim[1]:.6f}]")
-                
-                # Restore or set default title for Plot A
-                current_title = self.plot_a.ax.get_title()
-                if not current_title or current_title == "":
-                    self.plot_a.ax.set_title("absorption", pad=10, fontsize=12)
-                
-                # Initialize Plot C with empty view
-                self.plot_c.clear()
-                self.plot_c.ax.set_xlabel("Wavelength (nm)")
-                self.plot_c.ax.set_ylabel("Average Intensity")
-                self.plot_c.ax.set_title("Select time range in Plot A to calculate average")
-                self.plot_c.ax.grid(True)
-                
-                # Setup the selector for time range selection
-                self._setup_selector()
-                
-                # Check final scales after everything
-                final_xlim = self.plot_a.ax.get_xlim()
-                final_ylim = self.plot_a.ax.get_ylim()
-                print(f"\n[Tab 3] Final plot scales:")
-                print(f"[Tab 3] X-axis: [{final_xlim[0]:.6f}, {final_xlim[1]:.6f}]")
-                print(f"[Tab 3] Y-axis: [{final_ylim[0]:.6f}, {final_ylim[1]:.6f}]")
-            else:
-                print("No valid wavelength data available for plotting")
-                for plot in [self.plot_a, self.plot_c]:
-                    plot.clear()
-                    plot.ax.text(
-                        0.5, 0.5,
-                        "No valid wavelength data available",
-                        ha='center', va='center'
-                    )
-                    plot.canvas.draw()
-                    
-        except Exception as e:
-            print(f"Error updating intensity plots: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            for plot in [self.plot_a, self.plot_c]:
-                plot.clear()
-                plot.canvas.draw()
-                
-    @Slot()
-    def calculate_average(self):
-        """Calculate and plot average intensities."""
-        if self.current_data is None or self.selector is None:
-            return
-            
-        try:
-            # Get time range indices
-            time_points = np.array(self.current_data.time_points)
-            xmin, xmax = self.selector.extents
-            
-            # Get wavelength columns (excluding time column) from MA data
-            wavelength_columns = [col for col in self.current_data.moving_average_data.columns[1:]]  # Use MA data
-            
-            # Calculate averages using MA data
-            wavelengths = []
-            averages = []
-            
-            for col in wavelength_columns:
-                try:
-                    wave = float(col)
-                    values = self.current_data.moving_average_data[col].values  # Use MA data
-                    avg = np.mean(values[(time_points >= xmin) & (time_points <= xmax)])
-                    wavelengths.append(wave)
-                    averages.append(avg)
-                except (ValueError, KeyError):
-                    continue
-                    
-            # Sort by wavelength
-            wavelengths = np.array(wavelengths)
-            averages = np.array(averages)
-            sort_idx = np.argsort(wavelengths)
-            wavelengths = wavelengths[sort_idx]
-            averages = averages[sort_idx]
-            
-            # Plot results if we have data
-            if len(wavelengths) > 0:
-                self.plot_c.plot_average_intensity(
-                    wavelengths.tolist(),
-                    averages.tolist(),
-                    (xmin, xmax)
-                )
-            else:
-                self.plot_c.clear()
-                self.plot_c.ax.text(
-                    0.5, 0.5,
-                    "No valid wavelength data available",
-                    ha='center', va='center'
-                )
-                
-        except Exception as e:
-            print(f"Error calculating averages: {str(e)}")
-            self.plot_c.clear()
-
-    def _on_plot_a_draw(self, event):
-        """Handle plot A draw event with debouncing."""
-        if not self._sync_in_progress and self.plot_a.is_sync_enabled():
-            self._sync_in_progress = True
-            try:
-                xlim, ylim = self.plot_a.get_current_view()
-                self.plot_c.set_view(xlim, ylim)
-            finally:
-                self._sync_in_progress = False
-                
-    def _on_plot_c_draw(self, event):
-        """Handle plot C draw event with debouncing."""
-        if not self._sync_in_progress and self.plot_a.is_sync_enabled():
-            self._sync_in_progress = True
-            try:
-                xlim, ylim = self.plot_c.get_current_view()
-                self.plot_a.set_view(xlim, ylim)
-            finally:
-                self._sync_in_progress = False 
-
     def _on_apply_time_range(self):
         """Handle apply time range button click."""
         if self.current_data is None:
@@ -531,3 +339,114 @@ class IntensityTab(QWidget):
                 "Error",
                 f"Error applying time range: {str(e)}"
             ) 
+
+    def _on_plot_a_draw(self, event):
+        """Handle plot A draw event with debouncing."""
+        if not self._sync_in_progress and self.plot_a.is_sync_enabled():
+            self._sync_in_progress = True
+            try:
+                xlim, ylim = self.plot_a.get_current_view()
+                self.plot_c.set_view(xlim, ylim)
+            finally:
+                self._sync_in_progress = False
+                
+    def _on_plot_c_draw(self, event):
+        """Handle plot C draw event with debouncing."""
+        if not self._sync_in_progress and self.plot_a.is_sync_enabled():
+            self._sync_in_progress = True
+            try:
+                xlim, ylim = self.plot_c.get_current_view()
+                self.plot_a.set_view(xlim, ylim)
+            finally:
+                self._sync_in_progress = False 
+
+    def update_data(self, data: ProcessedData):
+        """Update displayed data."""
+        self.current_data = data
+        
+        try:
+            # Get wavelength columns (excluding time column)
+            wavelength_columns = [col for col in data.moving_average_data.columns[1:]]  # Use MA data
+            print(f"[Tab 3] Found {len(wavelength_columns)} wavelength columns")
+            
+            # Create data dictionary for plotting
+            plot_data = {}
+            all_values = []  # Track all values for scale calculation
+            for col in wavelength_columns:
+                try:
+                    wave = float(col)
+                    values = data.moving_average_data[col].to_numpy()  # Use to_numpy() like Tab 2
+                    # Validate data
+                    if len(values) > 0 and not np.all(np.isnan(values)):
+                        plot_data[wave] = values
+                        all_values.extend(values)
+                        print(f"[Tab 3] Added wavelength {wave}nm with {len(values)} points")
+                        print(f"[Tab 3] Value range for {wave}nm: {min(values):.6f} to {max(values):.6f}")
+                except (ValueError, KeyError) as e:
+                    print(f"Error processing column {col}: {str(e)}")
+                    continue
+            
+            if plot_data:
+                print(f"\n[Tab 3] Plotting {len(plot_data)} wavelengths")
+                print(f"[Tab 3] Time points: {len(data.time_points)} points")
+                print(f"[Tab 3] Time range: {min(data.time_points)} to {max(data.time_points)}")
+                
+                # Plot data in Plot A
+                self.plot_a.plot_all_wavelengths(
+                    data.time_points,
+                    plot_data,
+                    clear=True,
+                    respect_limits=False  # Let it calculate its own limits
+                )
+                
+                # Check actual scale after plotting
+                actual_xlim = self.plot_a.ax.get_xlim()
+                actual_ylim = self.plot_a.ax.get_ylim()
+                print(f"[Tab 3] Actual plot scales after plotting:")
+                print(f"[Tab 3] X-axis: [{actual_xlim[0]:.6f}, {actual_xlim[1]:.6f}]")
+                print(f"[Tab 3] Y-axis: [{actual_ylim[0]:.6f}, {actual_ylim[1]:.6f}]")
+                
+                # Initialize Plot C with empty view
+                self.plot_c.clear()
+                self.plot_c.ax.set_xlabel("Wavelength (nm)")
+                self.plot_c.ax.set_ylabel("Average Intensity")
+                self.plot_c.ax.set_title("Select time range in Plot A to calculate average")
+                self.plot_c.ax.grid(True)
+                
+                # Setup the selector for time range selection
+                self._setup_selector()
+                
+                # Check final scales after everything
+                final_xlim = self.plot_a.ax.get_xlim()
+                final_ylim = self.plot_a.ax.get_ylim()
+                print(f"\n[Tab 3] Final plot scales:")
+                print(f"[Tab 3] X-axis: [{final_xlim[0]:.6f}, {final_xlim[1]:.6f}]")
+                print(f"[Tab 3] Y-axis: [{final_ylim[0]:.6f}, {final_ylim[1]:.6f}]")
+            else:
+                print("No valid wavelength data available for plotting")
+                for plot in [self.plot_a, self.plot_c]:
+                    plot.clear()
+                    plot.ax.text(
+                        0.5, 0.5,
+                        "No valid wavelength data available",
+                        ha='center', va='center'
+                    )
+                    plot.canvas.draw()
+                    
+        except Exception as e:
+            print(f"Error updating intensity plots: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            for plot in [self.plot_a, self.plot_c]:
+                plot.clear()
+                plot.canvas.draw()
+
+    @Slot(str)
+    def update_plot_titles(self, tag: str):
+        """Update plot titles when tag changes in spectrum tab."""
+        if tag:
+            title = f"absorption: {tag}"
+            self.plot_a.ax.set_title(title, pad=10, fontsize=12)
+            self.plot_c.ax.set_title(f"average intensity v.s. wavelength: {tag}\ntime span: {int(self.plot_c.time_range[0])} - {int(self.plot_c.time_range[1])} ns" if self.plot_c.time_range else title, pad=10, fontsize=12)
+            self.plot_a.canvas.draw()
+            self.plot_c.canvas.draw() 

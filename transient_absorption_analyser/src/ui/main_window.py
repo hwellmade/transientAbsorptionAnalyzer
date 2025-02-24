@@ -91,12 +91,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.spectrum_tab, "Time Trace")
         self.tabs.addTab(self.intensity_tab, "Spectrum")
         
+        # Connect signals
+        self.load_tab.data_processed.connect(self.on_data_processed)
+        self.spectrum_tab.tag_changed.connect(self.intensity_tab.update_plot_titles)
+        
         # Add widgets to layout
         layout.addWidget(top_section)
         layout.addWidget(self.tabs)
-        
-        # Connect signals between tabs
-        self.load_tab.data_processed.connect(self.on_data_processed)
         
     @Slot(object)
     def on_data_processed(self, processed_data):
