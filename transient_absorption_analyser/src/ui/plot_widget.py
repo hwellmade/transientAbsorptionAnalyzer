@@ -3,7 +3,7 @@ Custom plot widget combining Qt and Matplotlib functionality.
 """
 from typing import Optional, Tuple, List
 import numpy as np
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QCheckBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QCheckBox, QSizePolicy
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg,
     NavigationToolbar2QT
@@ -25,38 +25,51 @@ class PlotWidget(QWidget):
         self.sync_zoom = sync_zoom
         self.highlighted_wavelength = None
         self.time_range = None
-        self._setup_ui()
         
-    def _setup_ui(self):
-        """Setup the widget's UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+        # Create the main layout first
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create matplotlib figure with reduced width (20% narrower)
-        original_width = 8
-        new_width = original_width * 0.8  # 20% narrower
-        self.figure = Figure(figsize=(new_width, 6))
+        # Create matplotlib components with updated size and DPI
+        self.figure = Figure(figsize=(6, 4), dpi=100)  # Reduced from (10, 6) to better fit the layout
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
+        self.ax = self.figure.add_subplot(111)
         
-        # Add sync checkbox if needed
+        # Configure the canvas
+        self.canvas.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+        
+        # Add widgets to layout
         if self.sync_zoom:
             self.sync_check = QCheckBox("Sync Zoom")
             self.sync_check.setChecked(True)
-            layout.addWidget(self.sync_check)
+            self.layout.addWidget(self.sync_check)
         
-        # Add matplotlib widgets
-        layout.addWidget(self.toolbar)
-        layout.addWidget(self.canvas)
+        self.layout.addWidget(self.toolbar)
+        self.layout.addWidget(self.canvas)
         
-        # Initialize plot
-        self.ax = self.figure.add_subplot(111)
-        self.ax.set_title(self.title)
+        # Configure plot after widget setup
+        self._setup_plot()
+        
+    def _setup_plot(self):
+        """Setup the plot configuration."""
+        # Configure figure margins with more space for labels and title
+        self.figure.subplots_adjust(
+            left=0.2,     # Increased left margin for y-label (was 0.15)
+            right=0.95,   # Right margin
+            top=0.90,     # Top margin for title
+            bottom=0.12,  # Bottom margin for x-label
+            wspace=0.2,   # Width spacing
+            hspace=0.1    # Height spacing
+        )
+        
+        # Set initial plot properties
+        if self.title:
+            self.ax.set_title(self.title, pad=15)
         self.ax.grid(True)
-        
-        # Adjust subplot parameters to give specified padding
-        # Increase left margin to accommodate y-label
-        self.figure.subplots_adjust(left=0.15, right=0.95, bottom=0.12, top=0.95)
         
     def plot_all_wavelengths(
         self,
@@ -98,15 +111,24 @@ class PlotWidget(QWidget):
         self.ax.set_xlim(xmin - x_padding, xmax + x_padding)
         self.ax.set_ylim(ymin - y_padding, ymax + y_padding)
         
-        # Set labels and grid
+        # Set labels and grid with increased padding
         self.ax.set_xlabel("Time (ns)", fontsize=10, labelpad=5)
-        self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=10)  # Increased labelpad
-        self.ax.set_title("absorption", pad=10)
-        self.ax.legend(fontsize=8)
+        self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=15)  # Increased labelpad
         self.ax.grid(True)
+        self.ax.legend(fontsize=8, loc='upper right')  # Specify legend location
         
-        # Adjust layout and draw
-        self.figure.subplots_adjust(left=0.15, right=0.95, bottom=0.12, top=0.95)
+        # Use the same margins as _setup_plot
+        self.figure.subplots_adjust(
+            left=0.2,     # Match the new left margin
+            right=0.95,
+            top=0.90,
+            bottom=0.12
+        )
+        
+        # Set title with padding
+        if self.ax.get_title():
+            self.ax.set_title(self.ax.get_title(), pad=15)
+            
         self.canvas.draw()
         
     def plot_highlighted_wavelengths(
@@ -168,15 +190,24 @@ class PlotWidget(QWidget):
         self.ax.set_xlim(xmin - x_padding, xmax + x_padding)
         self.ax.set_ylim(ymin - y_padding, ymax + y_padding)
         
-        # Set labels and grid
+        # Set labels and grid with increased padding
         self.ax.set_xlabel("Time (ns)", fontsize=10, labelpad=5)
-        self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=10)  # Increased labelpad
-        self.ax.set_title("absorption", pad=10)
-        self.ax.legend(fontsize=8)
+        self.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=15)  # Increased labelpad
         self.ax.grid(True)
+        self.ax.legend(fontsize=8, loc='upper right')  # Specify legend location
         
-        # Adjust layout and draw
-        self.figure.subplots_adjust(left=0.15, right=0.95, bottom=0.12, top=0.95)  # Updated margins
+        # Use the same margins as _setup_plot
+        self.figure.subplots_adjust(
+            left=0.2,     # Match the new left margin
+            right=0.95,
+            top=0.90,
+            bottom=0.12
+        )
+        
+        # Set title with padding
+        if self.ax.get_title():
+            self.ax.set_title(self.ax.get_title(), pad=15)
+            
         self.canvas.draw()
         
     def plot_average_intensity(
@@ -208,13 +239,23 @@ class PlotWidget(QWidget):
         self.ax.set_ylim(ymin - y_padding, ymax + y_padding)
         
         self.time_range = time_range
-        self.ax.set_xlabel("Wavelength (nm)")
-        self.ax.set_ylabel("Average Intensity")
-        self.ax.set_title(f"average intensity v.s. wavelength\ntime span: {time_range[0]:.2f} - {time_range[1]:.2f} ns")
+        # Set labels with increased padding
+        self.ax.set_xlabel("Wavelength (nm)", fontsize=10, labelpad=5)
+        self.ax.set_ylabel("Average Intensity", fontsize=10, labelpad=15)  # Increased labelpad
+        self.ax.set_title(
+            f"average intensity v.s. wavelength\ntime span: {time_range[0]:.2f} - {time_range[1]:.2f} ns",
+            pad=15
+        )
         self.ax.grid(True)
         
-        # Force update
-        self.figure.tight_layout()
+        # Use the same margins as _setup_plot
+        self.figure.subplots_adjust(
+            left=0.2,     # Match the new left margin
+            right=0.95,
+            top=0.90,
+            bottom=0.12
+        )
+        
         self.canvas.draw()
         
     def get_current_view(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:

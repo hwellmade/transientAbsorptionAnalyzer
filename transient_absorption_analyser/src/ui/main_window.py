@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         """Setup the user interface."""
         self.setWindowTitle("Transient Absorption Analyzer")
         self.resize(1200, 800)  # Set default size
+        self.showMaximized()  # Make window maximized on startup
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -134,5 +135,6 @@ class MainWindow(QMainWindow):
         return {
             'plot_A': self.spectrum_tab.plot_a,
             'plot_B': self.spectrum_tab.plot_b,
+            'plot_A_intensity': self.intensity_tab.plot_a,
             'plot_C': self.intensity_tab.plot_c
         } 

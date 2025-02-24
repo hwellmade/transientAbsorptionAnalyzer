@@ -15,7 +15,8 @@ def main():
     
     # Create and show main window
     window = MainWindow()
-    window.show()
+    window.show()  # Show first to initialize proper geometry
+    window.showMaximized()  # Then maximize
     
     sys.exit(app.exec())
 

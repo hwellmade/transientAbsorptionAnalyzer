@@ -152,6 +152,8 @@ class ExportManager:
                         f"avg_signal_vs_wavelength_time_"
                         f"{plot_widget.time_range[0]}_{plot_widget.time_range[1]}ns_{timestamp}"
                     )
+                elif plot_name == 'plot_A_intensity':  # New case for Plot A from Intensity tab
+                    base_name = f"time_range_selection_{timestamp}"
                 else:
                     base_name = f"all_spectrum_{timestamp}"
                 

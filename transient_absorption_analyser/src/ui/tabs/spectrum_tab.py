@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QToolBox,
     QSizePolicy,
-    QLineEdit
+    QLineEdit,
+    QApplication
 )
 from PySide6.QtCore import Qt, Slot, QSize
 import numpy as np
@@ -29,34 +30,52 @@ class SpectrumTab(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.current_data: Optional[ProcessedData] = None
-        self.wavelength_buttons = []  # Initialize the list
+        self.wavelength_buttons = []
+        self._sync_in_progress = False  # Add sync flag
+        
+        # Create the plots first
+        self.plot_a = PlotWidget()
+        self.plot_b = PlotWidget()
+        
+        # Configure plot sizes
+        for plot in [self.plot_a, self.plot_b]:
+            plot.setMinimumSize(600, 400)  # Updated to match new figure dimensions (6*100 x 4*100)
+            plot.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # Connect plot draw events for sync zoom
+        self.plot_a.canvas.mpl_connect('draw_event', self._on_plot_a_draw)
+        self.plot_b.canvas.mpl_connect('draw_event', self._on_plot_b_draw)
+        
+        # Setup UI after plots are created
         self.setup_ui()
+        
+        # Initialize plot views after UI setup
+        QApplication.processEvents()  # Let Qt process pending events
         self._initialize_default_view()
         
     def setup_ui(self):
         """Set up the UI layout."""
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 0, 0, 0)  # Add 20px padding on the left
-        main_layout.setSpacing(0)  # Remove spacing between elements
+        # Create layouts
+        main_layout = QVBoxLayout(self)  # Attach to self directly
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Create top section for plots
         plots_layout = QHBoxLayout()
-        plots_layout.setContentsMargins(20, 0, 0, 0)  # Add 20px padding on the left
-        plots_layout.setSpacing(10)  # Add small spacing between plots
+        plots_layout.setContentsMargins(0, 0, 0, 0)
+        plots_layout.setSpacing(20)
         
-        # Left side - Plot A and controls
+        # Left side - Plot A
         left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(20, 5, 5, 5)  # Add more padding on the left
-        left_layout.setSpacing(5)  # Add small spacing
+        left_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Add padding widget for toolbar
-        toolbar_padding = QWidget()
-        toolbar_padding.setFixedHeight(40)  # Padding for toolbar
-        left_layout.addWidget(toolbar_padding)
+        # Add title for Plot A
+        left_title = QLabel("All curves")
+        left_title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        left_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
+        left_title.setAlignment(Qt.AlignCenter)  # Center align the text
+        left_layout.addWidget(left_title)
         
-        # Plot A with increased height but reduced width
-        self.plot_a = PlotWidget()
-        self.plot_a.setFixedSize(480, 500)  # Set both width and height explicitly
+        self.plot_a.setMinimumSize(600, 400)  # Updated size here too for consistency
         left_layout.addWidget(self.plot_a)
         
         # Tag input section
@@ -78,21 +97,20 @@ class SpectrumTab(QWidget):
         # Create left container
         left_container = QWidget()
         left_container.setLayout(left_layout)
-        plots_layout.addWidget(left_container)
+        plots_layout.addWidget(left_container, 1)  # Changed weight to 1
         
-        # Right side - Plot B and wavelength selection
+        # Right side - Plot B
         right_layout = QVBoxLayout()
-        right_layout.setContentsMargins(5, 5, 5, 5)  # Keep standard padding
-        right_layout.setSpacing(5)  # Add small spacing
+        right_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Add padding widget for toolbar
-        toolbar_padding_right = QWidget()
-        toolbar_padding_right.setFixedHeight(40)  # Padding for toolbar
-        right_layout.addWidget(toolbar_padding_right)
+        # Add title for Plot B
+        right_title = QLabel("Highlight curves by choosing wavelengths")
+        right_title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        right_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
+        right_title.setAlignment(Qt.AlignCenter)  # Center align the text
+        right_layout.addWidget(right_title)
         
-        # Plot B with increased height but reduced width
-        self.plot_b = PlotWidget()
-        self.plot_b.setFixedSize(480, 500)  # Set both width and height explicitly
+        self.plot_b.setMinimumSize(600, 400)  # Updated size here too for consistency
         right_layout.addWidget(self.plot_b)
         
         # Create wavelength selection area
@@ -104,6 +122,7 @@ class SpectrumTab(QWidget):
         # Add header with label
         header_layout = QHBoxLayout()
         header_label = QLabel("Select Wavelengths:")
+        header_label.setAlignment(Qt.AlignCenter)  # Center align the text
         header_layout.addWidget(header_label)
         wavelength_layout.addLayout(header_layout)
         
@@ -130,23 +149,26 @@ class SpectrumTab(QWidget):
         # Create right container
         right_container = QWidget()
         right_container.setLayout(right_layout)
-        plots_layout.addWidget(right_container)
+        plots_layout.addWidget(right_container, 1)  # Changed weight to 1
         
-        # Add plots section to main layout
         main_layout.addLayout(plots_layout)
-        
-        self.setLayout(main_layout)
         
     def _initialize_default_view(self):
         """Initialize plot views with default ranges."""
-        # Start with a basic view that will be updated when data arrives
-        for plot in [self.plot_a, self.plot_b]:
-            plot.ax.set_xlim(0, 1)
-            plot.ax.set_ylim(-1, 1)
-            plot.ax.set_xlabel("Time (ns)", fontsize=10, labelpad=5)
-            plot.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=5)
-            plot.ax.set_title("absorption", pad=10, fontsize=12)  # Add default title
-            plot.canvas.draw()
+        if not self.plot_a or not self.plot_b:
+            return
+            
+        try:
+            # Start with a basic view that will be updated when data arrives
+            for plot in [self.plot_a, self.plot_b]:
+                plot.ax.set_xlim(0, 1)
+                plot.ax.set_ylim(-1, 1)
+                plot.ax.set_xlabel("Time (ns)", fontsize=10, labelpad=5)
+                plot.ax.set_ylabel("Intensity (a.u.)", fontsize=10, labelpad=5)
+                plot.ax.set_title("absorption", pad=10, fontsize=12)
+                plot.canvas.draw_idle()  # Use draw_idle instead of draw
+        except Exception as e:
+            print(f"Warning: Could not initialize plot view: {e}")
         
     def _update_plot_scales(self, data: ProcessedData):
         """Update plot scales based on actual data ranges."""
