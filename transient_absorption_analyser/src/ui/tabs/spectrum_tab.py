@@ -115,6 +115,9 @@ class SpectrumTab(QWidget):
         # Add Plot B (size already fixed in __init__)
         right_layout.addWidget(self.plot_b)
         
+        # Add stretch to push wavelength selection down
+        right_layout.addStretch(1)
+        
         # Create wavelength selection area
         wavelength_group = QFrame()
         wavelength_group.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
@@ -131,7 +134,7 @@ class SpectrumTab(QWidget):
         # Create scrollable area for wavelength selection
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setMaximumHeight(150)
+        scroll_area.setMaximumHeight(150)  # Keep existing height
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
         wavelength_widget = QWidget()
@@ -144,9 +147,6 @@ class SpectrumTab(QWidget):
         
         # Add wavelength selection to right layout
         right_layout.addWidget(wavelength_group)
-        
-        # Add stretch at the bottom of right layout to push everything up
-        right_layout.addStretch()
         
         # Create right container
         right_container = QWidget()
