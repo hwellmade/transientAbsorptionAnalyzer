@@ -68,5 +68,3 @@ design_note/
 # Batch files
 *.bat
 !run.bat
-!build.bat
-!clean.bat
