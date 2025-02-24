@@ -207,60 +207,74 @@ class SpectrumTab(QWidget):
         self.current_data = data
         
         try:
-            # First update the plot scales based on the new data
-            self._update_plot_scales(data)
-            
             # Get wavelength columns (excluding time column)
             wavelength_columns = [col for col in data.moving_average_data.columns[1:]]  # Use MA data
-            print(f"Found {len(wavelength_columns)} wavelength columns")
+            print(f"[Tab 2] Found {len(wavelength_columns)} wavelength columns")
             
             # Create data dictionary for plotting
             plot_data = {}
+            all_values = []  # Track all values for scale calculation
             for col in wavelength_columns:
                 try:
                     wave = float(col)
-                    values = data.moving_average_data[col].to_numpy()  # Use MA data
+                    values = data.moving_average_data[col].to_numpy()  # Use to_numpy() like Tab 2
                     # Validate data
                     if len(values) > 0 and not np.all(np.isnan(values)):
                         plot_data[wave] = values
-                        print(f"Added wavelength {wave}nm with {len(values)} points")
-                        print(f"Value range: {min(values)} to {max(values)}")
+                        all_values.extend(values)
+                        print(f"[Tab 2] Added wavelength {wave}nm with {len(values)} points")
+                        print(f"[Tab 2] Value range for {wave}nm: {min(values):.6f} to {max(values):.6f}")
                 except (ValueError, KeyError) as e:
                     print(f"Error processing column {col}: {str(e)}")
                     continue
             
-            # Update Plot A with available wavelengths
             if plot_data:
-                print(f"\nPlotting {len(plot_data)} wavelengths")
-                print(f"Time points: {len(data.time_points)} points")
-                print(f"Time range: {min(data.time_points)} to {max(data.time_points)}")
+                print(f"\n[Tab 2] Plotting {len(plot_data)} wavelengths")
+                print(f"[Tab 2] Time points: {len(data.time_points)} points")
+                print(f"[Tab 2] Time range: {min(data.time_points)} to {max(data.time_points)}")
                 
+                # Plot data in Plot A
                 self.plot_a.plot_all_wavelengths(
                     data.time_points,
-                    plot_data
+                    plot_data,
+                    clear=True,
+                    respect_limits=False
                 )
                 
-                # Restore or set default title for Plot A
-                current_title = self.plot_a.ax.get_title()
-                if not current_title or current_title == "":
-                    self.plot_a.ax.set_title("absorption", pad=10, fontsize=12)
-                self.plot_a.canvas.draw()
+                # Store the calculated limits
+                plot_a_xlim = self.plot_a.ax.get_xlim()
+                plot_a_ylim = self.plot_a.ax.get_ylim()
+                
+                # Check actual scale after plotting
+                print(f"[Tab 2] Actual plot scales after plotting:")
+                print(f"[Tab 2] X-axis: [{plot_a_xlim[0]:.6f}, {plot_a_xlim[1]:.6f}]")
+                print(f"[Tab 2] Y-axis: [{plot_a_ylim[0]:.6f}, {plot_a_ylim[1]:.6f}]")
                 
                 # Update wavelength selection
                 self.update_wavelength_buttons(sorted(plot_data.keys()))
                 
-                # Show all curves in grey initially in Plot B
+                # Show all curves in grey initially in Plot B, using the same limits as Plot A
                 self.plot_b.plot_highlighted_wavelengths(
                     data.time_points,
                     plot_data,
                     []  # No wavelengths highlighted initially
                 )
                 
-                # Restore or set default title for Plot B
-                current_title = self.plot_b.ax.get_title()
-                if not current_title or current_title == "":
-                    self.plot_b.ax.set_title("absorption", pad=10, fontsize=12)
-                self.plot_b.canvas.draw()
+                # Force both plots to use the same limits
+                for plot in [self.plot_a, self.plot_b]:
+                    plot.ax.set_xlim(plot_a_xlim)
+                    plot.ax.set_ylim(plot_a_ylim)
+                    # Set default title if none exists
+                    if not plot.ax.get_title():
+                        plot.ax.set_title("absorption", pad=10, fontsize=12)
+                    plot.canvas.draw()
+                
+                # Check final scales
+                final_xlim = self.plot_a.ax.get_xlim()
+                final_ylim = self.plot_a.ax.get_ylim()
+                print(f"\n[Tab 2] Final plot scales:")
+                print(f"[Tab 2] X-axis: [{final_xlim[0]:.6f}, {final_xlim[1]:.6f}]")
+                print(f"[Tab 2] Y-axis: [{final_ylim[0]:.6f}, {final_ylim[1]:.6f}]")
             else:
                 print("No valid wavelength data available for plotting")
                 self.plot_a.clear()
@@ -271,6 +285,8 @@ class SpectrumTab(QWidget):
                         "No valid wavelength data available",
                         ha='center', va='center'
                     )
+                    plot.ax.set_title("absorption", pad=10, fontsize=12)  # Set title even when no data
+                    plot.canvas.draw()
             
         except Exception as e:
             print(f"Error updating spectrum plots: {str(e)}")
