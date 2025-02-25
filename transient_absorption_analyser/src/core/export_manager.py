@@ -147,17 +147,17 @@ class ExportManager:
                 # Generate base name based on plot type
                 if plot_name == 'plot_B' and hasattr(plot_widget, 'highlighted_wavelength'):
                     base_name = f"curve_{plot_widget.highlighted_wavelength}_{timestamp}"
-                elif plot_name == 'plot_C' and hasattr(plot_widget, 'time_range'):
+                elif plot_name == 'plot_C' and hasattr(plot_widget, 'time_range') and plot_widget.time_range is not None:
                     base_name = (
                         f"avg_signal_vs_wavelength_time_"
-                        f"{plot_widget.time_range[0]}_{plot_widget.time_range[1]}ns_{timestamp}"
+                        f"{int(plot_widget.time_range[0])}_{int(plot_widget.time_range[1])}ns_{timestamp}"
                     )
                 elif plot_name == 'plot_A_intensity':  # New case for Plot A from Intensity tab
                     base_name = f"time_range_selection_{timestamp}"
                 else:
                     base_name = f"all_spectrum_{timestamp}"
                 
-                # Save only in PNG format
+                # Save in PNG format
                 save_path = fig_dir / f"{base_name}.png"
                 print(f"Saving figure to: {save_path}")
                 fig.savefig(save_path, dpi=300, bbox_inches='tight')

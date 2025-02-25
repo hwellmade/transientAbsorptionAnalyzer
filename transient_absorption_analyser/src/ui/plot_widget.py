@@ -278,7 +278,7 @@ class PlotWidget(QWidget):
         self.ax.set_xlabel("Wavelength (nm)")
         self.ax.set_ylabel("Average Intensity")
         self.ax.set_title(
-            f"average intensity v.s. wavelength\ntime span: {int(time_range[0])} - {int(time_range[1])} ns",
+            "average intensity v.s. wavelength",
             pad=8
         )
         self.ax.grid(True)

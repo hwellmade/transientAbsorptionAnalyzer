@@ -3,6 +3,7 @@ Intensity tab implementation for average intensity plotting.
 """
 from typing import Optional, Dict, List, Tuple
 import numpy as np
+import matplotlib.pyplot as plt
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,22 +17,105 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QLineEdit,
-    QMessageBox
+    QMessageBox,
+    QScrollArea,
+    QGroupBox,
+    QColorDialog
 )
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Slot, Signal
+from PySide6.QtGui import QColor
 from matplotlib.widgets import RectangleSelector, SpanSelector
 
 from ..plot_widget import PlotWidget
-from transient_absorption_analyser.src.core.data_processor import ProcessedData
+from ...core.data_processor import ProcessedData
+
+class TimeSpanEntry(QWidget):
+    """Widget for a single time span entry."""
+    
+    updated = Signal(dict)  # Emits when span is updated
+    removed = Signal(int)   # Emits index when removed
+    
+    def __init__(self, index: int, initial_color: QColor):
+        super().__init__()
+        self.index = index
+        self.current_color = initial_color
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 2, 5, 2)  # Compact layout
+        
+        # Time inputs
+        self.min_input = QLineEdit()
+        self.max_input = QLineEdit()
+        self.min_input.setPlaceholderText("Min time")
+        self.max_input.setPlaceholderText("Max time")
+        self.min_input.setFixedWidth(80)
+        self.max_input.setFixedWidth(80)
+        
+        # Color picker button
+        self.color_btn = QPushButton()
+        self.color_btn.setFixedSize(30, 20)
+        self.update_color_button()
+        
+        # Apply and Remove buttons
+        self.apply_btn = QPushButton("Apply")
+        self.remove_btn = QPushButton("Remove")
+        
+        # Add to layout
+        layout.addWidget(QLabel(f"Span {self.index + 1}:"))
+        layout.addWidget(QLabel("Min:"))
+        layout.addWidget(self.min_input)
+        layout.addWidget(QLabel("Max:"))
+        layout.addWidget(self.max_input)
+        layout.addWidget(self.color_btn)
+        layout.addWidget(self.apply_btn)
+        layout.addWidget(self.remove_btn)
+        layout.addStretch()
+        
+        # Connect signals
+        self.color_btn.clicked.connect(self.show_color_dialog)
+        self.apply_btn.clicked.connect(self.apply_changes)
+        self.remove_btn.clicked.connect(lambda: self.removed.emit(self.index))
+        
+    def show_color_dialog(self):
+        color = QColorDialog.getColor(self.current_color, self)
+        if color.isValid():
+            self.current_color = color
+            self.update_color_button()
+            
+    def update_color_button(self):
+        self.color_btn.setStyleSheet(
+            f"background-color: {self.current_color.name()};"
+            "border: 1px solid #999;"
+        )
+        
+    def apply_changes(self):
+        try:
+            min_time = float(self.min_input.text())
+            max_time = float(self.max_input.text())
+            self.updated.emit({
+                'index': self.index,
+                'min_time': min_time,
+                'max_time': max_time,
+                'color': self.current_color
+            })
+        except ValueError:
+            # Handle invalid input
+            pass
 
 class IntensityTab(QWidget):
     """Tab for intensity visualization."""
+    
+    MAX_TIME_SPANS = 10
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.current_data: Optional[ProcessedData] = None
         self.selector = None
         self._sync_in_progress = False
+        self.time_spans = []  # List to store time span data
+        self.time_span_entries = []  # List to store TimeSpanEntry widgets
         
         # Create plots first with sync_zoom=False
         self.plot_a = PlotWidget(sync_zoom=False)
@@ -49,107 +133,73 @@ class IntensityTab(QWidget):
         self._initialize_default_view()
         
     def setup_ui(self):
-        """Set up the UI layout."""
-        # Main layout is horizontal for left-right split
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)  # Remove outer margins
-        main_layout.setSpacing(20)  # Keep spacing between panels
-
-        # Left Panel (Time series plot)
-        left_panel = QVBoxLayout()
-        left_panel.setSpacing(5)
-        left_panel.setContentsMargins(0, 0, 0, 0)  # Remove margins
-
-        # Title for left panel
-        left_title = QLabel("Set the time range")
-        left_title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        left_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
-        left_title.setAlignment(Qt.AlignCenter)  # Center align the text
-        left_panel.addWidget(left_title)
-
-        # Plot container for left plot
-        plot_container_left = QWidget()
-        plot_layout_left = QVBoxLayout(plot_container_left)
-        plot_layout_left.setContentsMargins(0, 0, 0, 0)  # Remove margins
-        plot_layout_left.setSpacing(5)
-
-        # Plot A (Time series) with its toolbar
-        plot_layout_left.addWidget(self.plot_a)
+        """Setup the user interface."""
+        main_layout = QHBoxLayout(self)
         
-        # Add time range input section
-        time_range_layout = QHBoxLayout()
-        time_range_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Time min input
-        time_min_layout = QHBoxLayout()
-        time_min_label = QLabel("time min:")
-        self.time_min_input = QLineEdit()
-        self.time_min_input.setPlaceholderText("Enter min time")
-        time_min_unit = QLabel("(ns)")
-        time_min_layout.addWidget(time_min_label)
-        time_min_layout.addWidget(self.time_min_input)
-        time_min_layout.addWidget(time_min_unit)
-        
-        # Time max input
-        time_max_layout = QHBoxLayout()
-        time_max_label = QLabel("time max:")
-        self.time_max_input = QLineEdit()
-        self.time_max_input.setPlaceholderText("Enter max time")
-        time_max_unit = QLabel("(ns)")
-        time_max_layout.addWidget(time_max_label)
-        time_max_layout.addWidget(self.time_max_input)
-        time_max_layout.addWidget(time_max_unit)
-        
-        # Apply button for time range
-        self.apply_time_range_button = QPushButton("Apply Range")
-        self.apply_time_range_button.clicked.connect(self._on_apply_time_range)
-        
-        # Add all to time range layout
-        time_range_layout.addLayout(time_min_layout)
-        time_range_layout.addLayout(time_max_layout)
-        time_range_layout.addWidget(self.apply_time_range_button)
-        
-        plot_layout_left.addLayout(time_range_layout)
-        
-        left_panel.addWidget(plot_container_left)
-        left_panel.addStretch(1)  # Push everything to the top
-        
-        # Create left container
+        # Left side container
         left_container = QWidget()
-        left_container.setLayout(left_panel)
-        main_layout.addWidget(left_container, 1)  # Equal weight
-
-        # Right Panel (Average intensity plot)
-        right_panel = QVBoxLayout()
-        right_panel.setSpacing(5)
-        right_panel.setContentsMargins(0, 0, 0, 0)  # Remove margins
-
-        # Title for right panel
-        right_title = QLabel("average intensity v.s. wavelength")
-        right_title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        right_title.setContentsMargins(5, 5, 5, 5)  # Add small padding to title
-        right_title.setAlignment(Qt.AlignCenter)  # Center align the text
-        right_panel.addWidget(right_title)
-
-        # Plot container for right plot
-        plot_container_right = QWidget()
-        plot_layout_right = QVBoxLayout(plot_container_right)
-        plot_layout_right.setContentsMargins(0, 0, 0, 0)
-        plot_layout_right.setSpacing(5)
-
-        # Plot C (Average intensity vs wavelength) with its toolbar
-        plot_layout_right.addWidget(self.plot_c)
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         
-        right_panel.addWidget(plot_container_right)
-        right_panel.addStretch(1)  # Push everything to the top
+        # Plot A (top left)
+        self.plot_a = PlotWidget(sync_zoom=True)
+        left_layout.addWidget(self.plot_a)
         
-        # Create right container
-        right_container = QWidget()
-        right_container.setLayout(right_panel)
-        main_layout.addWidget(right_container, 1)  # Equal weight
-
-        # Set the main layout
-        self.setLayout(main_layout)
+        # Time span settings section (bottom left)
+        time_span_group = QGroupBox("Time Span Selection")
+        time_span_layout = QVBoxLayout(time_span_group)
+        time_span_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Add and Clear All buttons
+        buttons_layout = QHBoxLayout()
+        self.add_span_btn = QPushButton("Add Time Span")
+        self.clear_all_btn = QPushButton("Clear All")
+        self.add_span_btn.setStyleSheet(
+            "QPushButton { padding: 5px 10px; background-color: #4CAF50; color: white; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        self.clear_all_btn.setStyleSheet(
+            "QPushButton { padding: 5px 10px; background-color: #f44336; color: white; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #d32f2f; }"
+        )
+        buttons_layout.addWidget(self.add_span_btn)
+        buttons_layout.addWidget(self.clear_all_btn)
+        buttons_layout.addStretch()
+        time_span_layout.addLayout(buttons_layout)
+        
+        # Scrollable area for time spans
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setMaximumHeight(200)  # Limit height
+        
+        self.time_spans_widget = QWidget()
+        self.time_spans_layout = QVBoxLayout(self.time_spans_widget)
+        self.time_spans_layout.setSpacing(2)
+        self.time_spans_layout.setContentsMargins(2, 2, 2, 2)
+        scroll.setWidget(self.time_spans_widget)
+        time_span_layout.addWidget(scroll)
+        
+        # Add time span group to left layout
+        left_layout.addWidget(time_span_group)
+        
+        # Right side - Plot C only
+        self.plot_c = PlotWidget(sync_zoom=True)
+        
+        # Add containers to main layout
+        main_layout.addWidget(left_container)
+        main_layout.addWidget(self.plot_c)
+        
+        # Set stretch factors
+        main_layout.setStretchFactor(left_container, 1)
+        main_layout.setStretchFactor(self.plot_c, 1)
+        
+        # Connect signals
+        self.add_span_btn.clicked.connect(self.add_time_span)
+        self.clear_all_btn.clicked.connect(self.clear_all_spans)
+        
+        # Initialize first time span
+        self.add_time_span()
         
     def _initialize_default_view(self):
         """Initialize plot views with default ranges."""
@@ -167,30 +217,26 @@ class IntensityTab(QWidget):
         self.plot_c.canvas.draw()
         
     def _setup_selector(self):
-        """Setup the time range selector on Plot A."""
-        if self.selector is not None:
-            self.selector.disconnect_events()
-            
+        """Setup the span selector for manual time range selection."""
         self.selector = SpanSelector(
             self.plot_a.ax,
             self._on_select,
             'horizontal',
             useblit=True,
-            props=dict(alpha=0.3, facecolor='tab:blue'),
+            props=dict(alpha=0.2, facecolor='gray'),
             interactive=True,
             drag_from_anywhere=True
         )
         
-        # Add instruction text
-        self.plot_a.ax.text(
-            0.98, 0.02,
-            'Drag to select time period',
-            transform=self.plot_a.ax.transAxes,
-            ha='right',
-            va='bottom',
-            color='red',
-            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none')
-        )
+        # Add clear method to selector
+        def clear():
+            # Remove the span patch from the plot
+            if hasattr(self.selector, 'rect'):
+                self.selector.rect.remove()
+            # Reset the selector's extents
+            self.selector.extents = (0, 0)
+            self.plot_a.canvas.draw()
+        self.selector.clear = clear
         
     def _on_select(self, xmin: float, xmax: float):
         """Handle time range selection."""
@@ -449,4 +495,194 @@ class IntensityTab(QWidget):
             self.plot_a.ax.set_title(title, pad=10, fontsize=12)
             self.plot_c.ax.set_title(f"average intensity v.s. wavelength: {tag}\ntime span: {int(self.plot_c.time_range[0])} - {int(self.plot_c.time_range[1])} ns" if self.plot_c.time_range else title, pad=10, fontsize=12)
             self.plot_a.canvas.draw()
-            self.plot_c.canvas.draw() 
+            self.plot_c.canvas.draw()
+
+    def add_time_span(self):
+        """Add a new time span entry."""
+        if len(self.time_span_entries) >= self.MAX_TIME_SPANS:
+            return
+            
+        # Generate a new color from matplotlib color cycle
+        colors = plt.cm.tab10.colors
+        color_index = len(self.time_span_entries) % len(colors)
+        color = QColor.fromRgbF(*colors[color_index])
+        
+        # Create new entry
+        entry = TimeSpanEntry(len(self.time_span_entries), color)
+        entry.updated.connect(self.update_time_span)
+        entry.removed.connect(self.remove_time_span)
+        
+        # Add to layout and lists
+        self.time_spans_layout.addWidget(entry)
+        self.time_span_entries.append(entry)
+        
+        # Update Add button state
+        self.add_span_btn.setEnabled(len(self.time_span_entries) < self.MAX_TIME_SPANS)
+        
+    def update_time_span(self, span_data: dict):
+        """Update a time span and refresh plots."""
+        index = span_data['index']
+        
+        # Update time spans list
+        while len(self.time_spans) <= index:
+            self.time_spans.append(None)
+        self.time_spans[index] = span_data
+        
+        self.update_plots()
+        
+    def remove_time_span(self, index: int):
+        """Remove a time span entry."""
+        if 0 <= index < len(self.time_span_entries):
+            # Remove widget
+            entry = self.time_span_entries.pop(index)
+            self.time_spans_layout.removeWidget(entry)
+            entry.deleteLater()
+            
+            # Remove from time spans list
+            if index < len(self.time_spans):
+                self.time_spans.pop(index)
+            
+            # Update remaining indices
+            for i, entry in enumerate(self.time_span_entries):
+                entry.index = i
+            
+            # Enable Add button
+            self.add_span_btn.setEnabled(True)
+            
+            self.update_plots()
+            
+    def clear_all_spans(self):
+        """Clear all time span selections from plots without removing input rows."""
+        # Clear the time spans list but keep the entries
+        self.time_spans.clear()
+        
+        # Clear any drag-selected spans
+        if hasattr(self, 'selector') and self.selector is not None:
+            self.selector.clear()
+            
+        # Reset and redraw plots with base data
+        if self.current_data:
+            # Redraw Plot A with all wavelengths
+            wavelength_columns = [col for col in self.current_data.moving_average_data.columns[1:]]
+            plot_data = {}
+            for col in wavelength_columns:
+                try:
+                    wave = float(col)
+                    values = self.current_data.moving_average_data[col].to_numpy()
+                    if len(values) > 0 and not np.all(np.isnan(values)):
+                        plot_data[wave] = values
+                except (ValueError, KeyError):
+                    continue
+                    
+            if plot_data:
+                self.plot_a.plot_all_wavelengths(
+                    self.current_data.time_points,
+                    plot_data,
+                    clear=True,
+                    respect_limits=False
+                )
+            
+            # Clear Plot C and reset to default state
+            self.plot_c.clear()
+            self.plot_c.ax.set_xlabel("Wavelength (nm)")
+            self.plot_c.ax.set_ylabel("Average Intensity")
+            self.plot_c.ax.set_title("Select time range in Plot A to calculate average")
+            self.plot_c.ax.grid(True)
+            self.plot_c.canvas.draw()
+
+    def update_plots(self):
+        """Update both plots with current time spans."""
+        if not self.current_data or not self.time_spans:
+            return
+            
+        # Clear plots
+        self.plot_a.ax.clear()
+        self.plot_c.ax.clear()
+        
+        # Get MA data
+        ma_data = self.current_data.moving_average_data
+        time_points = ma_data.iloc[:, 0].to_numpy()
+        
+        # Clean up column names by removing spaces
+        ma_data.columns = [col.strip() if isinstance(col, str) else col for col in ma_data.columns]
+        wavelengths = [float(col) for col in ma_data.columns[1:]]
+        
+        # Debug info
+        print(f"[Debug] Available columns in MA data (after cleanup): {ma_data.columns.tolist()}")
+        print(f"[Debug] Number of time spans: {len(self.time_spans)}")
+        
+        # Plot A: Show all data with colored spans
+        for col in ma_data.columns[1:]:  # Skip time column
+            self.plot_a.ax.plot(time_points, ma_data[col], color='gray', alpha=0.5)
+            
+        # Add colored spans and plot averaged data
+        for span in self.time_spans:
+            if span is None:
+                continue
+                
+            print(f"[Debug] Processing time span: {span['min_time']} - {span['max_time']}")
+            
+            # Add span to Plot A
+            color = span['color'].getRgbF()[:3]  # Convert QColor to RGB
+            self.plot_a.ax.axvspan(
+                span['min_time'],
+                span['max_time'],
+                color=color,
+                alpha=0.2
+            )
+            
+            # Calculate and plot averaged data
+            mask = (time_points >= span['min_time']) & (time_points <= span['max_time'])
+            averages = []
+            
+            for wave in wavelengths:
+                # Convert wavelength to match column format
+                col_name = str(int(wave))  # Convert to integer string format
+                try:
+                    values = ma_data[col_name][mask]
+                    avg = np.mean(values)
+                    averages.append(avg)
+                    print(f"[Debug] Calculated average for wavelength {col_name}: {avg}")
+                except KeyError as e:
+                    print(f"[Debug] Error accessing wavelength {col_name}: {str(e)}")
+                    print(f"[Debug] Available columns: {ma_data.columns.tolist()}")
+                    continue
+                
+            # Only plot if we have averages
+            if averages:
+                self.plot_c.ax.plot(
+                    wavelengths,
+                    averages,
+                    color=color,
+                    marker='o',  # Add circular markers
+                    markersize=6,  # Set marker size
+                    markerfacecolor=color,  # Fill color same as line
+                    markeredgecolor='white',  # White edge for better visibility
+                    markeredgewidth=1,  # Edge width
+                    label=f"{int(span['min_time'])}-{int(span['max_time'])} ns"
+                )
+            else:
+                print("[Debug] No averages calculated for this time span")
+            
+        # Update plot settings
+        self.plot_a.ax.set_xlabel("Time (ns)")
+        self.plot_a.ax.set_ylabel("Intensity")
+        self.plot_a.ax.grid(True)
+        
+        self.plot_c.ax.set_xlabel("Wavelength (nm)")
+        self.plot_c.ax.set_ylabel("Average Intensity")
+        self.plot_c.ax.grid(True)
+        self.plot_c.ax.legend()
+        
+        # Set title for Plot C
+        if self.time_spans and any(span is not None for span in self.time_spans):
+            self.plot_c.ax.set_title(
+                "average intensity v.s. wavelength",
+                pad=8
+            )
+        else:
+            self.plot_c.ax.set_title("Select time range in Plot A to calculate average")
+        
+        # Redraw
+        self.plot_a.canvas.draw()
+        self.plot_c.canvas.draw() 
