@@ -145,22 +145,31 @@ class ExportManager:
                 fig = plot_widget.figure
                 
                 # Generate base name based on plot type
-                if plot_name == 'plot_B' and hasattr(plot_widget, 'highlighted_wavelength'):
+                if plot_name == 'plot_A':  # Add condition for Plot A from Spectrum tab
+                    base_name = f"all_wavelengths_{timestamp}"
+                elif plot_name == 'plot_B' and hasattr(plot_widget, 'highlighted_wavelength'):
                     base_name = f"curve_{plot_widget.highlighted_wavelength}_{timestamp}"
                 elif plot_name == 'plot_C' and hasattr(plot_widget, 'time_range') and plot_widget.time_range is not None:
                     base_name = (
                         f"avg_signal_vs_wavelength_time_"
                         f"{int(plot_widget.time_range[0])}_{int(plot_widget.time_range[1])}ns_{timestamp}"
                     )
-                elif plot_name == 'plot_A_intensity':  # New case for Plot A from Intensity tab
+                elif plot_name == 'plot_A_intensity':  # Plot A from Intensity tab
                     base_name = f"time_range_selection_{timestamp}"
                 else:
                     base_name = f"all_spectrum_{timestamp}"
                 
                 # Save in PNG format
-                save_path = fig_dir / f"{base_name}.png"
-                print(f"Saving figure to: {save_path}")
-                fig.savefig(save_path, dpi=300, bbox_inches='tight')
+                png_path = fig_dir / f"{base_name}.png"
+                print(f"Saving PNG to: {png_path}")
+                fig.savefig(png_path, dpi=300, bbox_inches='tight')
+                
+                # Save in pickle format for editability
+                pickle_path = fig_dir / f"{base_name}.pkl"
+                print(f"Saving editable figure to: {pickle_path}")
+                import pickle
+                with open(pickle_path, 'wb') as file:
+                    pickle.dump(fig, file)
         except Exception as e:
             print(f"Error in _export_figures: {str(e)}")
             raise 
